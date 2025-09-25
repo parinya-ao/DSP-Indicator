@@ -1,0 +1,18 @@
+[package]
+name = "DSP_RUST"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+csv = "1.3.1"
+# Enable `ttf` so Plotters can draw text on BitMapBackend
+plotters = { version = "0.3.7", default-features = false, features = ["chrono", "bitmap_backend", "bitmap_encoder", "line_series", "ttf"] }
+rustfft = "6.4.0"
+serde = { version = "1.0", features = ["derive"] }
+tokio = { version = "1.47.1", features = ["full"] }
+yahoo_finance_api = "4.1.0"
+chrono = "0.4.42"
+ndarray = "0.16.1"
+
+[lints.rust]
+unsafe_code = "forbid"
