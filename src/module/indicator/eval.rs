@@ -8,7 +8,7 @@ pub fn eval_percent(file_path: PathBuf) -> f64 {
     let length: f64 = real_price.len() as f64;
 
     let val: f64 = eval(file_path) as f64;
-    return cal_percent_f64(val, length);
+    cal_percent_f64(val, length)
 }
 
 pub fn eval(file_path: PathBuf) -> i64 {

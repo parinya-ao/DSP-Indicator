@@ -395,3 +395,123 @@ pub fn plot_graph(csv_path: &PathBuf) -> Result<(), Box<dyn Error>> {
 
     Ok(())
 }
+
+pub fn plot_graph_from_points(
+    points_in: &[(i64, f64)],
+    title: &str,
+) -> Result<PathBuf, Box<dyn Error>> {
+    if points_in.is_empty() {
+        return Err("No points provided".into());
+    }
+
+    // แปลง timestamp เป็น DateTime, กรองค่า invalid
+    let mut pts: Vec<(DateTime<Utc>, f64)> = points_in
+        .iter()
+        .filter_map(|(ts, v)| ts_to_datetime(*ts).map(|d| (d, *v)))
+        .collect();
+
+    if pts.is_empty() {
+        return Err("No valid timestamps after conversion".into());
+    }
+
+    // sort by datetime
+    pts.sort_by_key(|(d, _)| *d);
+
+    // x-range
+    let mut x0 = pts.first().unwrap().0;
+    let mut x1 = pts.last().unwrap().0;
+    if x0 == x1 {
+        x0 = x0 - chrono::Duration::minutes(1);
+        x1 = x1 + chrono::Duration::minutes(1);
+    }
+
+    // y-range with padding
+    let (mut y_min, mut y_max) = pts
+        .iter()
+        .fold((f64::INFINITY, f64::NEG_INFINITY), |(mn, mx), &(_, v)| {
+            (mn.min(v), mx.max(v))
+        });
+    if (y_max - y_min).abs() < std::f64::EPSILON {
+        y_min -= 1.0;
+        y_max += 1.0;
+    } else {
+        let pad = (y_max - y_min) * 0.05;
+        y_min -= pad;
+        y_max += pad;
+    }
+
+    // prepare output path
+    let cwd = std::env::current_dir()?;
+    let out_path = cwd.join("data/diff_plot.png");
+    if let Some(parent) = out_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    // plotting scope so backend is dropped before we return out_path
+    {
+        let root = BitMapBackend::new(&out_path, (1200, 700)).into_drawing_area();
+        root.fill(&WHITE)?;
+
+        let font_family =
+            std::env::var("PLOT_FONT_FAMILY").unwrap_or_else(|_| "DejaVu Sans".into());
+
+        let mut chart = ChartBuilder::on(&root)
+            .caption(title, (font_family.as_str(), 24))
+            .x_label_area_size(40)
+            .y_label_area_size(60)
+            .margin(10)
+            .build_cartesian_2d(x0..x1, y_min..y_max)?;
+
+        // choose x formatting depending on span
+        let span_days = x1.signed_duration_since(x0).num_days().abs();
+        let fmt = if span_days > 365 {
+            "%Y"
+        } else if span_days > 90 {
+            "%Y-%m"
+        } else {
+            "%Y-%m-%d"
+        };
+
+        chart
+            .configure_mesh()
+            .x_labels(8)
+            .x_label_formatter(&|d| d.format(fmt).to_string())
+            .y_desc("Value")
+            .x_desc("Date (UTC)")
+            .label_style((font_family.as_str(), 14))
+            .axis_desc_style((font_family.as_str(), 16))
+            .draw()?;
+
+        // draw line
+        chart
+            .draw_series(LineSeries::new(pts.iter().map(|(d, v)| (*d, *v)), &BLUE))?
+            .label("diff")
+            .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 40, y)], &BLUE));
+
+        // optional: sample markers (avoid clutter)
+        let skip = (pts.len() / 200).max(1);
+        chart.draw_series(
+            pts.iter()
+                .enumerate()
+                .filter(|(i, _)| i % skip == 0)
+                .map(|(_, (d, v))| Circle::new((*d, *v), 2, BLUE.filled())),
+        )?;
+
+        chart
+            .configure_series_labels()
+            .border_style(&BLACK)
+            .draw()?;
+
+        drop(chart);
+        root.present()?;
+    } // root dropped here
+
+    // small pause (ensure fs)
+    std::thread::sleep(std::time::Duration::from_millis(50));
+
+    if !out_path.exists() {
+        return Err("Plot file was not created".into());
+    }
+
+    Ok(out_path)
+}

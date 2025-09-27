@@ -1,0 +1,1 @@
+// arima = arma ทำบน stationary

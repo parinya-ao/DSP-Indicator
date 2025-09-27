@@ -1,0 +1,6 @@
+// ...existing code...
+fn kpss_bandwidth(n: usize) -> usize {
+    let i = ((12.0 * ((n as f64) / 100.0).powf(0.25)).floor() as usize).clamp(1, 24);
+    i
+}
+// ...existing code...
