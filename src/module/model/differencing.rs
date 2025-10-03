@@ -16,7 +16,7 @@ fn cal_differencing_with_time(data: Vec<(i64, f64)>) -> Vec<(i64, f64)> {
     let mut diffs: Vec<(i64, f64)> = Vec::with_capacity(data.len().saturating_sub(1));
     for w in data.windows(2) {
         let (prev_time, prev_value) = w[0];
-        let (next_time, next_value) = w[1];
+        let (_, next_value) = w[1];
         let diff = next_value - prev_value;
 
         diffs.push((prev_time, diff));

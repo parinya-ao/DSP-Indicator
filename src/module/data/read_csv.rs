@@ -11,7 +11,9 @@ struct CsvRow3 {
 
 pub fn read_close_series(csv_path: &PathBuf) -> Result<Vec<(i64, f64)>, Box<dyn Error>> {
     // Try headered 3-column file first: timestamp,volume,close
-    let mut rdr = ReaderBuilder::new().trim(csv::Trim::All).from_path(csv_path)?;
+    let mut rdr = ReaderBuilder::new()
+        .trim(csv::Trim::All)
+        .from_path(csv_path)?;
     let mut rows: Vec<(i64, f64)> = Vec::new();
     let mut tried_headered = false;
 
@@ -79,4 +81,3 @@ pub fn read_close_series(csv_path: &PathBuf) -> Result<Vec<(i64, f64)>, Box<dyn 
     rows.sort_by_key(|(ts, _)| *ts);
     Ok(rows)
 }
-
