@@ -1,2 +1,2 @@
-pub mod plot_graph;
 pub mod plot_fft;
+pub mod plot_graph;

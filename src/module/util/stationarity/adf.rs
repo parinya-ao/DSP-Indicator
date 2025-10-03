@@ -100,44 +100,44 @@ fn invert_posdef(a: &[Vec<f64>]) -> Vec<Vec<f64>> {
 }
 
 /// สร้าง design matrix สำหรับ model: Δy_t = α + β y_{t-1} + Σ γ_i Δy_{t-i} + ε_t
-fn design_matrix(y: &[f64], lags: usize) -> (Vec<Vec<f64>>, Vec<f64>) {
-    let n = y.len();
+fn design_matrix(series: &[f64], lags: usize) -> (Vec<Vec<f64>>, Vec<f64>) {
+    let n = series.len();
     assert!(n >= lags + 2, "series too short for chosen lags");
     let mut dy = vec![0.0; n];
     for t in 1..n {
-        dy[t] = y[t] - y[t - 1];
+        dy[t] = series[t] - series[t - 1];
     }
 
-    let mut X = Vec::new();
-    let mut Y = Vec::new();
+    let mut x = Vec::new();
+    let mut targets = Vec::new();
     for t in (lags + 1)..n {
         let mut row = Vec::with_capacity(2 + lags);
         row.push(1.0);
-        row.push(y[t - 1]);
+        row.push(series[t - 1]);
         for i in 1..=lags {
             row.push(dy[t - i]);
         }
-        X.push(row);
-        Y.push(dy[t]);
+        x.push(row);
+        targets.push(dy[t]);
     }
-    (X, Y)
+    (x, targets)
 }
 
 pub fn adf_test_level(y: &[f64], lags: usize) -> AdfResult {
-    let (X, Y) = design_matrix(y, lags);
-    let xt = transpose(&X);
-    let xtx = matmul(&xt, &X);
-    let xty = matvec(&xt, &Y);
+    let (x, y) = design_matrix(y, lags);
+    let xt = transpose(&x);
+    let xtx = matmul(&xt, &x);
+    let xty = matvec(&xt, &y);
     let coef = solve_normal_equations(xtx.clone(), xty);
 
     // fitted & residuals
-    let y_hat = matvec(&X, &coef);
+    let y_hat = matvec(&x, &coef);
     let mut rss = 0.0;
-    for (a, b) in Y.iter().zip(y_hat.iter()) {
+    for (a, b) in y.iter().zip(y_hat.iter()) {
         let e = a - b;
         rss += e * e;
     }
-    let n = Y.len();
+    let n = y.len();
     let k = coef.len();
     let sigma2 = (rss / ((n as i64 - k as i64).max(1) as f64)).max(1e-18);
 

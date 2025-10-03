@@ -1,4 +1,4 @@
-mod debug;
+pub mod debug;
 pub mod function;
 pub mod math;
 pub mod stationarity;

@@ -1,16 +1,24 @@
-pub fn calculate_sma(data: &Vec<f64>) -> f64 {
-    /*
-    function sample mean averge don't using wight
-     */
-    let mut mean: f64 = 0.0;
-    let length: usize = data.len();
 
-    for val in data {
-        mean += val;
+/// this function calculate value mean average kub
+pub fn calculate_sma(data: &[f64]) -> f64 {
+    data.iter().sum::<f64>() / data.len() as f64
+}
+// why change &Vec<f64> to &[f64]
+
+
+pub fn sma_series(data: &[f64], period: usize) -> Vec<Option<f64>> {
+    let n = data.len();
+    let mut out = vec![None; n];
+    if period == 0 || n < period {
+        return out;
     }
-    mean = mean / length as f64;
-
-    mean
+    let mut sum: f64 = data[..period].iter().sum();
+    out[period - 1] = Some(sum / period as f64);
+    for t in period..n {
+        sum += data[t] - data[t - period];
+        out[t] = Some(sum / period as f64);
+    }
+    out
 }
 
 #[cfg(test)]

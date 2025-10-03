@@ -1,11 +1,14 @@
 use crate::module::util::windows::hann::hann_window;
-use rustfft::{num_complex::Complex, FftPlanner};
+use rustfft::{FftPlanner, num_complex::Complex};
 use std::error::Error;
 use std::thread;
 
 /// Compute one-sided FFT amplitude spectrum (frequencies in cycles/year).
 /// returns (freqs_cpy, mags)
-pub fn fft_spectrum(closes: &[f64], fs_per_day: f64) -> Result<(Vec<f64>, Vec<f64>), Box<dyn Error>> {
+pub fn fft_spectrum(
+    closes: &[f64],
+    fs_per_day: f64,
+) -> Result<(Vec<f64>, Vec<f64>), Box<dyn Error>> {
     if closes.len() < 2 {
         return Err("not enough samples".into());
     }
@@ -36,8 +39,8 @@ pub fn fft_spectrum(closes: &[f64], fs_per_day: f64) -> Result<(Vec<f64>, Vec<f6
         fft.process(&mut buf);
         buf
     })
-        .join()
-        .map_err(|_| "FFT thread panicked")?;
+    .join()
+    .map_err(|_| "FFT thread panicked")?;
 
     // One-sided amplitude spectrum
     let half = n / 2;
