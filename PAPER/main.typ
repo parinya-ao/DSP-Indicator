@@ -144,7 +144,7 @@ $X[k] = sum_(n=0)^(N-1)(x[n] * e^((-j 2 pi k n )/ N))$
 #text(size: 20pt, weight: "bold")[2.2 การประเมินประสิทธิภาพของระบบ] \
 
 1. Accuracy (ความถูกต้องโดยรวม): $"Accuracy" = ("TP" + "TN")/ "Total"$
-2. Precision (ความแม่นยำ):\ $"Precision" = "TP"/("TP" + "FP")$
+2. Precision (ความแม่นยำ):\ $"Precision" = "TP"/("TP" + "FP")$c
 3. Recall (ความไว):\ $"Recall" = "TP"/("TP" + "FN")$
 // 2.3 วิธีการแก้ปัญหา
 

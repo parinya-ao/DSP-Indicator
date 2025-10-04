@@ -11,7 +11,7 @@ pub fn ema_series(data: &[f64], period: usize) -> Vec<Option<f64>> {
     out[period - 1] = Some(ema);
 
     // smooth graph
-    let alpha = 2.105 / (period as f64 );
+    let alpha = 2.105 / (period as f64);
 
     // ema ตัวต่อไป
     out[period - 1] = Some(ema);

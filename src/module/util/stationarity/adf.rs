@@ -10,10 +10,12 @@ pub struct AdfResult {
 // Solve linear system via normal equations (small dims)
 fn solve_normal_equations(mut xtx: Vec<Vec<f64>>, xty: Vec<f64>) -> Vec<f64> {
     let n = xty.len();
-    // augment
+
+    // xty push ต่อหลัง xyx เพื่อทำ gaussian elimination
     for i in 0..n {
         xtx[i].push(xty[i]);
     }
+
     // Gaussian elimination
     for i in 0..n {
         // pivot
@@ -38,9 +40,15 @@ fn solve_normal_equations(mut xtx: Vec<Vec<f64>>, xty: Vec<f64>) -> Vec<f64> {
             }
         }
     }
-    (0..n).map(|i| xtx[i][n]).collect()
+
+    let mut result = Vec::with_capacity(n);
+    for i in 0..n {
+        result.push(xtx[i][n]);
+    }
+    result
 }
 
+// transpose matrix
 fn transpose(m: &[Vec<f64>]) -> Vec<Vec<f64>> {
     let r = m.len();
     let c = m[0].len();
@@ -52,6 +60,8 @@ fn transpose(m: &[Vec<f64>]) -> Vec<Vec<f64>> {
     }
     t
 }
+
+// matrix multiplication
 fn matmul(a: &[Vec<f64>], b: &[Vec<f64>]) -> Vec<Vec<f64>> {
     let r = a.len();
     let k = a[0].len();
@@ -68,6 +78,7 @@ fn matmul(a: &[Vec<f64>], b: &[Vec<f64>]) -> Vec<Vec<f64>> {
     }
     out
 }
+
 fn matvec(a: &[Vec<f64>], v: &[f64]) -> Vec<f64> {
     let r = a.len();
     let c = a[0].len();
@@ -88,7 +99,7 @@ fn invert_posdef(a: &[Vec<f64>]) -> Vec<Vec<f64>> {
     let mut inv = vec![vec![0.0; n]; n];
     for j in 0..n {
         // build xtx and xty for solve_normal_equations
-        let mut aug = a.to_vec();
+        let aug = a.to_vec();
         let mut e = vec![0.0; n];
         e[j] = 1.0;
         let x = solve_normal_equations(aug, e);
@@ -104,6 +115,8 @@ fn design_matrix(series: &[f64], lags: usize) -> (Vec<Vec<f64>>, Vec<f64>) {
     let n = series.len();
     assert!(n >= lags + 2, "series too short for chosen lags");
     let mut dy = vec![0.0; n];
+
+    // difference vec
     for t in 1..n {
         dy[t] = series[t] - series[t - 1];
     }
@@ -123,6 +136,7 @@ fn design_matrix(series: &[f64], lags: usize) -> (Vec<Vec<f64>>, Vec<f64>) {
     (x, targets)
 }
 
+// function calculate adf test level
 pub fn adf_test_level(y: &[f64], lags: usize) -> AdfResult {
     let (x, y) = design_matrix(y, lags);
     let xt = transpose(&x);

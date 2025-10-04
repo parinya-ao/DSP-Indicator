@@ -62,32 +62,6 @@ pub fn eval_percent_ema_fast_slow(
     cal_percent_f64(report.hits as f64, report.total as f64)
 }
 
-pub fn eval(file_path: PathBuf, ema_period: usize, sma_period: usize) -> i64 {
-    let close = load_close_series(&file_path);
-    let EvaluatedStrategy { report, .. } = evaluate_basic(
-        &close,
-        Strategy::EmaGtSma {
-            ema: ema_period,
-            sma: sma_period,
-        },
-    );
-    report.hits as i64
-}
-
-pub fn eval_precision(file_path: PathBuf, ema_period: usize, sma_period: usize) -> f64 {
-    build_eval_report(file_path, ema_period, sma_period).precision()
-}
-
-pub fn eval_recall(file_path: PathBuf, ema_period: usize, sma_period: usize) -> f64 {
-    build_eval_report(file_path, ema_period, sma_period).recall()
-}
-
-pub fn calculate(file_path: PathBuf, ema_period: usize, sma_period: usize) -> EvalReport {
-    let config = default_three_eval_config(ema_period, sma_period);
-    let result = calculate_three(file_path, config, None);
-    result.ema_gt_sma.report.clone()
-}
-
 pub fn build_eval_report(path: PathBuf, ema_period: usize, sma_period: usize) -> EvalReport {
     let close = load_close_series(&path);
     let EvaluatedStrategy { report, .. } = evaluate_basic(
@@ -106,7 +80,7 @@ pub fn compute_metrics(r: &EvalReport) -> EvalMetrics {
     let tp = r.up_up as f64;
     let fp = r.up_down as f64;
     let fn_ = r.down_up as f64;
-    let tn = r.down_down as f64;
+    let _tn = r.down_down as f64;
 
     // accuracy ความถูกต้อง คือการเอา (TP + FP) / (TOTAL)
     let accuracy = if total > 0.0 {

@@ -1,10 +1,8 @@
-
 /// this function calculate value mean average kub
 pub fn calculate_sma(data: &[f64]) -> f64 {
     data.iter().sum::<f64>() / data.len() as f64
 }
 // why change &Vec<f64> to &[f64]
-
 
 pub fn sma_series(data: &[f64], period: usize) -> Vec<Option<f64>> {
     let n = data.len();

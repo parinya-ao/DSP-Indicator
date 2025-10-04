@@ -36,7 +36,7 @@ pub fn plot_fft(data_path: &PathBuf) -> Result<(), Box<dyn Error>> {
     );
 
     // Call util function to get spectrum
-    let (mut freqs_cpy, mut mags) = fft_spectrum(&closes, fs_per_day)?;
+    let (freqs_cpy, mags) = fft_spectrum(&closes, fs_per_day)?;
 
     // Build plot range: focus 0..20 cycles/year
     let focus_max = 20.0_f64;
