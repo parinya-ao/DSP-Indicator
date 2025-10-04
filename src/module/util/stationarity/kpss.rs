@@ -1,3 +1,5 @@
+use crate::module::util::windows::hann::hann_window;
+
 #[derive(Debug, Clone, Copy)]
 pub struct KpssResult {
     pub stat: f64,
@@ -5,20 +7,27 @@ pub struct KpssResult {
     pub n: usize,
 }
 
+// calculate level for stationnary test
 fn residual_level(y: &[f64]) -> Vec<f64> {
     let n = y.len();
+    // find mean
     let mean = y.iter().sum::<f64>() / n.max(1) as f64;
+
+    // calculate residual level ของกราฟดู thread
     y.iter().map(|v| v - mean).collect()
 }
 
-// Newey-West LRV with Bartlett weights
+/// คำนวณ newvy west long run variance (LRV)
 fn newey_west_lrv(e: &[f64], bw: usize) -> f64 {
     let n = e.len();
+    // calculate gamma0 γ₀ = long run variance
     let mut gamma0 = 0.0;
     for t in 0..n {
         gamma0 += e[t] * e[t];
     }
     gamma0 /= n as f64;
+
+    let windows = hann_window(2 * bw + 1);
     let mut lrv = gamma0;
     for j in 1..=bw {
         let mut gj = 0.0;
@@ -26,7 +35,7 @@ fn newey_west_lrv(e: &[f64], bw: usize) -> f64 {
             gj += e[t] * e[t - j];
         }
         gj /= n as f64;
-        let w = 1.0 - (j as f64) / ((bw + 1) as f64);
+        let w = windows[bw + j];
         lrv += 2.0 * w * gj;
     }
     lrv.max(1e-18)

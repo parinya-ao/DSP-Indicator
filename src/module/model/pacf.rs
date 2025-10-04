@@ -287,7 +287,7 @@ pub fn choose_q_largest_significant(acf_vals: &[f64], n: usize) -> usize {
 }
 
 // ---------------- Example helper to print ACF and suggested q ----------------
-pub fn acf_and_choose_q(y: &[f64], max_lag: usize) {
+pub fn acf_and_choose_q(y: &[f64], max_lag: usize) -> usize {
     let n = y.len();
     let ci = acf_conf95(n);
     // try fast fft-based acf
@@ -298,9 +298,10 @@ pub fn acf_and_choose_q(y: &[f64], max_lag: usize) {
     let q_first = choose_q_first_drop(&acf_fast[1..].to_vec(), n); // pass k>=1 vector
     let q_largest = choose_q_largest_significant(&acf_fast[1..].to_vec(), n);
 
-    println!("CI95 ±{:.4}", ci);
-    println!("ACF (FFT)  = {:?}", acf_fast[1..].to_vec());
-    println!("ACF (direct)= {:?}", acf_unbiased[1..].to_vec());
-    println!("q (first-drop) = {}", q_first);
-    println!("q (largest significant) = {}", q_largest);
+    // println!("CI95 ±{:.4}", ci);
+    // println!("ACF (FFT)  = {:?}", acf_fast[1..].to_vec());
+    // println!("ACF (direct)= {:?}", acf_unbiased[1..].to_vec());
+    // println!("q (first-drop) = {}", q_first);
+    // println!("q (largest significant) = {}", q_largest);
+    q_first
 }

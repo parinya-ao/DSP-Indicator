@@ -1,4 +1,7 @@
 use std::path::PathBuf;
+use std::time::Instant;
+
+use indicatif::{ProgressBar, ProgressStyle};
 
 use crate::module::{
     data::read_csv::read_close_series,
@@ -7,29 +10,40 @@ use crate::module::{
         differencing::differencing,
         pacf::{acf_and_choose_q, choose_p_cutoff_first_drop, pacf_levinson, pacf_ols},
     },
-    util::stationarity::print_stationarity_checks,
+    util::{function::smooth_ma::smooth_graph, stationarity::print_stationarity_checks},
 };
 
 #[derive(Clone, Debug)]
-struct ArmaParams {
-    c: f64,
-    phi: Vec<f64>,
-    theta: Vec<f64>,
+pub struct ArmaParams {
+    pub c: f64,
+    pub phi: Vec<f64>,
+    pub theta: Vec<f64>,
 }
 
+#[derive(Clone, Debug)]
+pub struct ArmaModel {
+    pub p: usize,
+    pub q: usize,
+    pub params: ArmaParams,
+    pub aic: f64,
+    pub bic: f64,
+}
+
+/// function convert parameters to arma parameter
 fn unpack_params(u: &[f64], p: usize, q: usize) -> ArmaParams {
     let c = u[0];
     let mut phi = Vec::with_capacity(p);
     let mut theta = Vec::with_capacity(q);
     for i in 0..p {
-        phi.push(u[1 + i].tanh());
+        phi.push(u[1 + i].tanh()); // AR parameters (bound -1 to 1)
     }
     for j in 0..q {
-        theta.push(u[1 + p + j].tanh());
+        theta.push(u[1 + p + j].tanh()); // MA parameters (bound -1 to 1)
     }
     ArmaParams { c, phi, theta }
 }
 
+// function calculate arma residuals
 fn arma_residuals(y: &[f64], par: &ArmaParams) -> Vec<f64> {
     let n = y.len();
     let p = par.phi.len();
@@ -37,17 +51,20 @@ fn arma_residuals(y: &[f64], par: &ArmaParams) -> Vec<f64> {
     let mut e = vec![0.0; n];
     for t in 0..n {
         let mut yhat = par.c;
+        // AR part: φ_i · y_{t-i}
         for i in 1..=p {
             if t >= i {
                 yhat += par.phi[i - 1] * y[t - i];
             }
         }
+
+        // MA part: θ_j · ε_{t-j}
         for j in 1..=q {
             if t >= j {
                 yhat += par.theta[j - 1] * e[t - j];
             }
         }
-        e[t] = y[t] - yhat;
+        e[t] = y[t] - yhat; // residual
     }
     e
 }
@@ -138,6 +155,49 @@ fn fit_arma_css(y: &[f64], p: usize, q: usize) -> ArmaParams {
     unpack_params(&ubest, p, q)
 }
 
+/// Calculate AIC (Akaike Information Criterion)
+fn calculate_aic(n: usize, sse: f64, k: usize) -> f64 {
+    if n == 0 || sse <= 0.0 {
+        return f64::INFINITY;
+    }
+    let sigma2 = sse / n as f64;
+    n as f64 * sigma2.ln() + 2.0 * k as f64
+}
+
+/// Calculate BIC (Bayesian Information Criterion)
+fn calculate_bic(n: usize, sse: f64, k: usize) -> f64 {
+    if n == 0 || sse <= 0.0 {
+        return f64::INFINITY;
+    }
+    let sigma2 = sse / n as f64;
+    n as f64 * sigma2.ln() + k as f64 * (n as f64).ln()
+}
+
+/// Fit ARIMA model and calculate AIC/BIC
+pub fn fit_arma_with_ic(series: &[f64], p: usize, q: usize) -> Option<ArmaModel> {
+    if series.len() < 2 || series.len() <= p + q {
+        return None;
+    }
+
+    let params = fit_arma_css(series, p, q);
+    let residuals = arma_residuals(series, &params);
+    let sse: f64 = residuals.iter().map(|e| e * e).sum();
+
+    let n = series.len();
+    let k = 1 + p + q; // number of parameters (c + phi + theta)
+
+    let aic = calculate_aic(n, sse, k);
+    let bic = calculate_bic(n, sse, k);
+
+    Some(ArmaModel {
+        p,
+        q,
+        params,
+        aic,
+        bic,
+    })
+}
+
 fn arma_predict_rolling(y: &[f64], par: &ArmaParams) -> Vec<f64> {
     let n = y.len();
     if n <= 1 {
@@ -198,26 +258,86 @@ fn values_only(ts: &[(i64, f64)]) -> Vec<f64> {
     ts.iter().map(|(_, v)| *v).collect()
 }
 
-pub fn arima_model() {
+/// Auto ARIMA: Grid search to find optimal (p, d, q) using AIC/BIC
+pub fn auto_arma(series: &[f64], max_p: usize, max_q: usize) -> Option<ArmaModel> {
+    let mut best_model: Option<ArmaModel> = None;
+    let mut best_bic = f64::INFINITY;
+
+    if series.len() < 2 {
+        eprintln!("Series too short for ARMA search");
+        return None;
+    }
+
+    println!("\n=== Auto ARMA Grid Search ===");
+    println!("Searching p=[0..{}], q=[0..{}]", max_p, max_q);
+
+    let total = (max_p + 1) * (max_q + 1);
+    let pb = ProgressBar::new(total as u64);
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template(
+                "{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {pos}/{len} ({eta})",
+            )
+            .unwrap()
+            .progress_chars("█░ "),
+    );
+
+    for p in 0..=max_p {
+        for q in 0..=max_q {
+            if p == 0 && q == 0 {
+                pb.inc(1);
+                continue; // skip trivial model
+            }
+
+            if let Some(model) = fit_arma_with_ic(series, p, q) {
+                if model.bic < best_bic {
+                    best_bic = model.bic;
+                    best_model = Some(model);
+                }
+            }
+            pb.inc(1);
+        }
+    }
+
+    pb.finish_with_message("Grid search completed");
+
+    if let Some(ref model) = best_model {
+        println!(
+            "\n🏆 Best ARMA({},{}) - AIC={:.4}, BIC={:.4}",
+            model.p, model.q, model.aic, model.bic
+        );
+        println!(
+            "    c={:.6}, phi={:?}, theta={:?}",
+            model.params.c, model.params.phi, model.params.theta
+        );
+    }
+
+    best_model
+}
+
+pub fn arma_model() {
     // 1. มีข้อมูลแบบ time series
     // ref: https://medium.com/@lengyi/arima-model-%E0%B8%95%E0%B8%AD%E0%B8%99%E0%B8%97%E0%B8%B5%E0%B9%88-1-%E0%B9%80%E0%B8%82%E0%B9%89%E0%B8%B2%E0%B9%83%E0%B8%88-arima-%E0%B9%81%E0%B8%9A%E0%B8%9A-practical-6d66a36f4e82?source=post_page-----d0d2bc916c68---------------------------------------
-    let data_path = PathBuf::from("data/SPX.csv");
+    let data_path = PathBuf::from("data/SPX_log.csv");
 
     let diff = differencing(data_path.clone());
+
+    // smooth graph using ema
+    let period: usize = 1;
+    let diff_smooth = smooth_graph(&diff, period);
 
     // 2. หา integradted (d) และความเป็น stationnary alaysis
     // https://lengyi.medium.com/arima-model-%E0%B8%95%E0%B8%AD%E0%B8%99%E0%B8%97%E0%B8%B5%E0%B9%88-2-%E0%B8%AB%E0%B8%B2-integrated-d-%E0%B9%81%E0%B8%A5%E0%B8%B0-stationary-analysis-38df96394207
 
     print_stationarity_checks(&diff);
 
-    // summary ค่า diffence เป็น stationary
-    // ค่า d ใน arima = 0
+    // summary ค่า diffence เป็น stationary อยู่แล้ว -> เลือกใช้ ARMA (ตรึง d = 0)
 
     // 3. หา AR (p) ด้วย Partial Autocorrelation Function
     // ref: https://lengyi.medium.com/arima-model-%E0%B8%95%E0%B8%AD%E0%B8%99%E0%B8%97%E0%B8%B5%E0%B9%88-3-%E0%B8%AB%E0%B8%B2-ar-p-%E0%B8%94%E0%B9%89%E0%B8%A7%E0%B8%A2-partial-autocorrelation-function-5f5afb359683
-    let lag = 12;
-    let pacf_ld = pacf_levinson(&diff, lag, true);
-    let pacf_ols = pacf_ols(&diff, lag, true, false);
+    let lag = 24;
+    let pacf_ld = pacf_levinson(&diff_smooth, lag, true);
+    let pacf_ols = pacf_ols(&diff_smooth, lag, true, false);
 
     let p_ld = choose_p_cutoff_first_drop(&pacf_ld, diff.len());
     let p_ols = choose_p_cutoff_first_drop(&pacf_ols, diff.len());
@@ -231,48 +351,41 @@ pub fn arima_model() {
 
     // 4. find q using ma(q) by autocorrelation function
     // https://lengyi.medium.com/arima-model-%E0%B8%95%E0%B8%AD%E0%B8%99%E0%B8%97%E0%B8%B5%E0%B9%88-4-%E0%B8%AB%E0%B8%B2-ma-q-%E0%B8%94%E0%B9%89%E0%B8%A7%E0%B8%A2-autocorrelation-function-ac3a07d12a57
-    acf_and_choose_q(&diff, lag);
-    // q = 2
 
     let p = p_ld.max(p_ols);
-    let q = 2usize;
+    let q = acf_and_choose_q(&diff_smooth, lag);
 
-    let levels_pairs = read_close_series(&data_path).expect("read close");
-    let levels = values_only(&levels_pairs);
-    if levels.len() < 2 {
-        eprintln!("need at least 2 data points for ARMA evaluation");
+    if diff.len() < 2 {
+        eprintln!("need at least 2 differenced points for ARMA evaluation");
         return;
     }
 
-    let d = 0usize;
-    let y = diff_n(&levels, d);
-    if y.len() < 2 {
-        eprintln!("differenced series too short for ARMA({}, {})", p, q);
-        return;
-    }
-
-    let params = fit_arma_css(&y, p, q);
+    let params = fit_arma_css(&diff_smooth, p, q);
     println!(
         "Fitted ARMA({},{}): c={:.6}, phi={:?}, theta={:?}",
         p, q, params.c, params.phi, params.theta
     );
 
-    let pred_next_y = arma_predict_rolling(&y, &params);
-    if pred_next_y.len() < levels.len().saturating_sub(1) {
+    let pred_next_diff = arma_predict_rolling(&diff_smooth, &params);
+    if pred_next_diff.len() + 1 != diff.len() {
         eprintln!("prediction series shorter than needed; skip evaluation");
         return;
     }
 
-    let pred_next_level = if d == 0 {
-        pred_next_y.clone()
-    } else {
-        invert_diff_1(&levels, &pred_next_y)
-    };
+    let levels_pairs = read_close_series(&data_path).expect("read close");
+    let levels = values_only(&levels_pairs);
+    if levels.len() < 3 {
+        eprintln!("need at least 3 data points for directional evaluation");
+        return;
+    }
+
+    let levels_for_eval = &levels[1..];
+    let pred_next_level = invert_diff_1(levels_for_eval, &pred_next_diff);
 
     let rep = evaluate_directional_accuracy(
-        &levels,
-        &pred_next_level,
-        TargetKind::Level,
+        levels_for_eval,
+        &pred_next_diff,
+        TargetKind::Diff,
         ZeroRule::Ignore,
     );
     let metrics = calculate(&rep);
@@ -292,4 +405,14 @@ pub fn arima_model() {
         metrics.precision * 100.0,
         metrics.recall * 100.0
     );
+
+    println!(
+        "Sample predicted levels (first 5) = {:?}",
+        &pred_next_level[..pred_next_level.len().min(5)]
+    );
+}
+
+#[allow(dead_code)]
+pub fn arima_model() {
+    arma_model();
 }

@@ -15,7 +15,9 @@ chrono = "0.4.42"
 ndarray = "0.16.1"
 indicatif = "0.18.0"
 nalgebra = "0.34.1"
-num-complex = "0.4.6"
 
 [lints.rust]
 unsafe_code = "forbid"
+
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "target-feature=+avx2,+fma"]
