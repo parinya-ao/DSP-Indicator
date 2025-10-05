@@ -4,6 +4,7 @@
 
 use nalgebra::{DMatrix, DVector};
 use rustfft::{FftPlanner, num_complex::Complex as RComplex};
+use plotters::prelude::*;
 
 // เอา slice list มาแล้วหาค่าเฉลี่ย
 fn mean(x: &[f64]) -> f64 {
@@ -284,6 +285,191 @@ pub fn choose_q_largest_significant(acf_vals: &[f64], n: usize) -> usize {
         }
     }
     last_sig
+}
+
+// ---------------- Plotting functions ----------------
+
+/// Plot ACF with confidence interval
+pub fn plot_acf(
+    y: &[f64],
+    max_lag: usize,
+    output_path: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let n = y.len();
+    let ci = acf_conf95(n);
+    let acf_vals = acf_fft(y, max_lag, true);
+
+    let root = BitMapBackend::new(output_path, (800, 600)).into_drawing_area();
+    root.fill(&WHITE)?;
+
+    let max_abs = acf_vals[1..]
+        .iter()
+        .map(|&v| v.abs())
+        .fold(ci * 1.2, f64::max);
+
+    let mut chart = ChartBuilder::on(&root)
+        .caption("Autocorrelation Function (ACF)", ("sans-serif", 30))
+        .margin(10)
+        .x_label_area_size(40)
+        .y_label_area_size(50)
+        .build_cartesian_2d(0f64..(max_lag as f64), -max_abs..max_abs)?;
+
+    chart
+        .configure_mesh()
+        .x_desc("Lag")
+        .y_desc("ACF")
+        .draw()?;
+
+    // Draw confidence interval lines
+    chart.draw_series(LineSeries::new(
+        vec![(0.0, ci), (max_lag as f64, ci)],
+        &BLUE,
+    ))?;
+
+    chart.draw_series(LineSeries::new(
+        vec![(0.0, -ci), (max_lag as f64, -ci)],
+        &BLUE,
+    ))?;
+
+    // Draw zero line
+    chart.draw_series(LineSeries::new(
+        vec![(0.0, 0.0), (max_lag as f64, 0.0)],
+        BLACK.stroke_width(1),
+    ))?;
+
+    // Draw ACF bars (skip lag 0)
+    for (i, &val) in acf_vals[1..].iter().enumerate() {
+        let lag = (i + 1) as f64;
+        let color = if val.abs() > ci { RED } else { BLUE };
+        chart.draw_series(std::iter::once(Rectangle::new(
+            [(lag - 0.3, 0.0), (lag + 0.3, val)],
+            color.filled(),
+        )))?;
+    }
+
+    root.present()?;
+    println!("ACF plot saved to: {}", output_path);
+    Ok(())
+}
+
+/// Plot PACF with confidence interval
+pub fn plot_pacf(
+    y: &[f64],
+    max_lag: usize,
+    output_path: &str,
+    use_ols: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let n = y.len();
+    let ci = pacf_conf95(n);
+    let pacf_vals = if use_ols {
+        pacf_ols(y, max_lag, true, false)
+    } else {
+        pacf_levinson(y, max_lag, true)
+    };
+
+    let root = BitMapBackend::new(output_path, (800, 600)).into_drawing_area();
+    root.fill(&WHITE)?;
+
+    let max_abs = pacf_vals
+        .iter()
+        .map(|&v| v.abs())
+        .fold(ci * 1.2, f64::max);
+
+    let mut chart = ChartBuilder::on(&root)
+        .caption(
+            format!("Partial Autocorrelation Function (PACF)"),
+            ("sans-serif", 30),
+        )
+        .margin(10)
+        .x_label_area_size(40)
+        .y_label_area_size(50)
+        .build_cartesian_2d(0f64..(max_lag as f64 + 1.0), -max_abs..max_abs)?;
+
+    chart
+        .configure_mesh()
+        .x_desc("Lag")
+        .y_desc("PACF")
+        .draw()?;
+
+    // Draw confidence interval lines
+    chart.draw_series(LineSeries::new(
+        vec![(0.0, ci), ((max_lag + 1) as f64, ci)],
+        &BLUE,
+    ))?;
+
+    chart.draw_series(LineSeries::new(
+        vec![(0.0, -ci), ((max_lag + 1) as f64, -ci)],
+        &BLUE,
+    ))?;
+
+    // Draw zero line
+    chart.draw_series(LineSeries::new(
+        vec![(0.0, 0.0), ((max_lag + 1) as f64, 0.0)],
+        BLACK.stroke_width(1),
+    ))?;
+
+    // Draw PACF bars
+    for (i, &val) in pacf_vals.iter().enumerate() {
+        let lag = (i + 1) as f64;
+        let color = if val.abs() > ci { RED } else { BLUE };
+        chart.draw_series(std::iter::once(Rectangle::new(
+            [(lag - 0.3, 0.0), (lag + 0.3, val)],
+            color.filled(),
+        )))?;
+    }
+
+    root.present()?;
+    println!("PACF plot saved to: {}", output_path);
+    Ok(())
+}
+
+/// Plot both ACF and PACF and analyze p and q
+pub fn plot_acf_pacf_analysis(
+    y: &[f64],
+    max_lag: usize,
+    acf_output: &str,
+    pacf_output: &str,
+) -> Result<(usize, usize), Box<dyn std::error::Error>> {
+    let n = y.len();
+
+    // Calculate ACF and PACF
+    let acf_vals = acf_fft(y, max_lag, true);
+    let pacf_vals = pacf_levinson(y, max_lag, true);
+
+    // Find p and q
+    let p = choose_p_cutoff_first_drop(&pacf_vals, n);
+    let q = choose_q_first_drop(&acf_vals[1..].to_vec(), n);
+
+    // Plot ACF
+    plot_acf(y, max_lag, acf_output)?;
+
+    // Plot PACF
+    plot_pacf(y, max_lag, pacf_output, false)?;
+
+    // Print analysis
+    let ci_acf = acf_conf95(n);
+    let ci_pacf = pacf_conf95(n);
+
+    println!("\n=== ACF & PACF Analysis ===");
+    println!("Sample size (n): {}", n);
+    println!("ACF  95% CI: ±{:.4}", ci_acf);
+    println!("PACF 95% CI: ±{:.4}", ci_pacf);
+    println!("\nACF values (lag 1-{}):", max_lag);
+    for (i, &val) in acf_vals[1..].iter().enumerate() {
+        let sig = if val.abs() > ci_acf { "*" } else { " " };
+        println!("  Lag {:2}: {:7.4} {}", i + 1, val, sig);
+    }
+    println!("\nPACF values (lag 1-{}):", max_lag);
+    for (i, &val) in pacf_vals.iter().enumerate() {
+        let sig = if val.abs() > ci_pacf { "*" } else { " " };
+        println!("  Lag {:2}: {:7.4} {}", i + 1, val, sig);
+    }
+    println!("\n=== ARMA Parameters ===");
+    println!("p (AR order from PACF): {}", p);
+    println!("q (MA order from ACF):  {}", q);
+    println!("=> Suggested model: ARMA({}, {})", p, q);
+
+    Ok((p, q))
 }
 
 // ---------------- Example helper to print ACF and suggested q ----------------
