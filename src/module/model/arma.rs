@@ -8,7 +8,7 @@ use crate::module::{
     eval::{TargetKind, ZeroRule, calculate, evaluate_directional_accuracy},
     model::{
         differencing::differencing,
-        pacf::{acf_and_choose_q, choose_p_cutoff_first_drop, pacf_levinson, pacf_ols},
+        pacf::{acf_and_choose_q, choose_p_cutoff_first_drop, pacf_levinson, pacf_ols, plot_acf_pacf_analysis},
     },
     util::{function::smooth_ma::smooth_graph, stationarity::print_stationarity_checks},
 };
@@ -74,8 +74,7 @@ fn css_sse(y: &[f64], u: &[f64], p: usize, q: usize) -> f64 {
     arma_residuals(y, &par).iter().map(|v| v * v).sum()
 }
 
-fn nelder_mead_min<F>(x0: Vec<f64>, f: F, max_iter: usize, tol: f64) -> Vec<f64>
-where
+fn nelder_mead_min<F>(x0: Vec<f64>, f: F, max_iter: usize, tol: f64) -> Vec<f64> where
     F: Fn(&[f64]) -> f64,
 {
     let n = x0.len();
@@ -333,27 +332,31 @@ pub fn arma_model() {
 
     // summary ค่า diffence เป็น stationary อยู่แล้ว -> เลือกใช้ ARMA (ตรึง d = 0)
 
-    // 3. หา AR (p) ด้วย Partial Autocorrelation Function
+    // 3. หา AR (p) ด้วย Partial Autocorrelation Function และ MA (q) ด้วย Autocorrelation Function
     // ref: https://lengyi.medium.com/arima-model-%E0%B8%95%E0%B8%AD%E0%B8%99%E0%B8%97%E0%B8%B5%E0%B9%88-3-%E0%B8%AB%E0%B8%B2-ar-p-%E0%B8%94%E0%B9%89%E0%B8%A7%E0%B8%A2-partial-autocorrelation-function-5f5afb359683
+    // ref: https://lengyi.medium.com/arima-model-%E0%B8%95%E0%B8%AD%E0%B8%99%E0%B8%97%E0%B8%B5%E0%B9%88-4-%E0%B8%AB%E0%B8%B2-ma-q-%E0%B8%94%E0%B9%89%E0%B8%A7%E0%B8%A2-autocorrelation-function-ac3a07d12a57
     let lag = 24;
-    let pacf_ld = pacf_levinson(&diff_smooth, lag, true);
-    let pacf_ols = pacf_ols(&diff_smooth, lag, true, false);
 
-    let p_ld = choose_p_cutoff_first_drop(&pacf_ld, diff.len());
-    let p_ols = choose_p_cutoff_first_drop(&pacf_ols, diff.len());
-
-    // println!("CI95 ±{:.4}", pacf_conf95(diff.len()));
-    // println!("PACF (LD)  = {:?}", pacf_ld);
-    // println!("p (LD)     = {}", p_ld);
-    // println!("PACF (OLS) = {:?}", pacf_ols);
-    // println!("p (OLS)    = {}", p_ols);
-    // p = 1
-
-    // 4. find q using ma(q) by autocorrelation function
-    // https://lengyi.medium.com/arima-model-%E0%B8%95%E0%B8%AD%E0%B8%99%E0%B8%97%E0%B8%B5%E0%B9%88-4-%E0%B8%AB%E0%B8%B2-ma-q-%E0%B8%94%E0%B9%89%E0%B8%A7%E0%B8%A2-autocorrelation-function-ac3a07d12a57
-
-    let p = p_ld.max(p_ols);
-    let q = acf_and_choose_q(&diff_smooth, lag);
+    // Plot ACF และ PACF พร้อมวิเคราะห์หาค่า p และ q
+    let (p, q) = match plot_acf_pacf_analysis(
+        &diff_smooth,
+        lag,
+        "output/acf_plot.png",
+        "output/pacf_plot.png",
+    ) {
+        Ok((p_val, q_val)) => (p_val, q_val),
+        Err(e) => {
+            eprintln!("Error plotting ACF/PACF: {}", e);
+            // Fallback to manual calculation
+            let pacf_ld = pacf_levinson(&diff_smooth, lag, true);
+            let pacf_ols = pacf_ols(&diff_smooth, lag, true, false);
+            let p_ld = choose_p_cutoff_first_drop(&pacf_ld, diff.len());
+            let p_ols = choose_p_cutoff_first_drop(&pacf_ols, diff.len());
+            let p = p_ld.max(p_ols);
+            let q = acf_and_choose_q(&diff_smooth, lag);
+            (p, q)
+        }
+    };
 
     if diff.len() < 2 {
         eprintln!("need at least 2 differenced points for ARMA evaluation");
@@ -361,10 +364,10 @@ pub fn arma_model() {
     }
 
     let params = fit_arma_css(&diff_smooth, p, q);
-    println!(
-        "Fitted ARMA({},{}): c={:.6}, phi={:?}, theta={:?}",
-        p, q, params.c, params.phi, params.theta
-    );
+    // println!(
+    //     "Fitted ARMA({},{}): c={:.6}, phi={:?}, theta={:?}",
+    //     p, q, params.c, params.phi, params.theta
+    // );
 
     let pred_next_diff = arma_predict_rolling(&diff_smooth, &params);
     if pred_next_diff.len() + 1 != diff.len() {
@@ -390,26 +393,26 @@ pub fn arma_model() {
     );
     let metrics = calculate(&rep);
     println!(
-        "Directional Accuracy = {:.2}%  (hits={} / total={}, skipped={})",
+        "Directional Accuracy = {:.2}%  (hits={} / total={})",
         metrics.accuracy * 100.0,
         rep.hits,
         rep.total,
-        rep.skipped
+        // rep.skipped
     );
-    println!(
-        "Breakdown: up&up={}  down&down={}  up&down={}  down&up={}",
-        rep.up_up, rep.down_down, rep.up_down, rep.down_up
-    );
-    println!(
-        "Directional Precision = {:.2}%  Recall = {:.2}%",
-        metrics.precision * 100.0,
-        metrics.recall * 100.0
-    );
+    // println!(
+    //     "Breakdown: up&up={}  down&down={}  up&down={}  down&up={}",
+    //     rep.up_up, rep.down_down, rep.up_down, rep.down_up
+    // );
+    // println!(
+    //     "Directional Precision = {:.2}%  Recall = {:.2}%",
+    //     metrics.precision * 100.0,
+    //     metrics.recall * 100.0
+    // );
 
-    println!(
-        "Sample predicted levels (first 5) = {:?}",
-        &pred_next_level[..pred_next_level.len().min(5)]
-    );
+    // println!(
+    //     "Sample predicted levels (first 5) = {:?}",
+    //     &pred_next_level[..pred_next_level.len().min(5)]
+    // );
 }
 
 #[allow(dead_code)]
