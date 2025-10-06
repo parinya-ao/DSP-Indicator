@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use std::time::Instant;
+// use std::time::Instant;
 
 use indicatif::{ProgressBar, ProgressStyle};
 
@@ -387,7 +387,7 @@ pub fn arma_model() {
     }
 
     let levels_for_eval = &levels[1..];
-    let pred_next_level = invert_diff_1(levels_for_eval, &pred_next_diff);
+    let _pred_next_level = invert_diff_1(levels_for_eval, &pred_next_diff);
 
     let rep = evaluate_directional_accuracy(
         levels_for_eval,

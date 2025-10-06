@@ -3,8 +3,7 @@ use std::time::Instant;
 
 use crate::module::data::read_csv::read_close_series;
 use crate::module::indicator::eval::{
-    EvalMetrics, compute_metrics, eval_percent_ema_fast_slow, eval_percent_ema_sma,
-    eval_with_signals,
+    EvalMetrics, eval_percent_ema_fast_slow, eval_percent_ema_sma,
 };
 use crate::module::model::{
     arma::{ArmaModel, fit_arma_with_ic},
