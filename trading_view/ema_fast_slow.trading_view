@@ -1,0 +1,119 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © parinya_ao
+
+//@version=6
+indicator("xEMA-xx", overlay=true)
+
+//****************************************************************************//
+// User Inputs
+xprd1 = input.int(title='Fast EMA period', defval=101, minval=1)
+xprd2 = input.int(title='Slow EMA period', defval=484, minval=1)
+fillSW = input.bool(title='Paint Bar Colors', defval=true)
+fastSW = input.bool(title='Show Fast EMA line', defval=true)
+slowSW = input.bool(title='Show Slow EMA line', defval=true)
+plotSigsw = input.bool(title='Plot Buy/Sell Signals?', defval=true)
+labelSwitch = input.bool(title='Show Label', defval=true)
+
+//****************************************************************************//
+// Calculate EMAs
+ema101 = ta.ema(close, xprd1)
+ema484 = ta.ema(close, xprd2)
+
+//****************************************************************************//
+// Define Bullish/Bearish
+isBullish = ema101 > ema484  // เขียว
+isBearish = ema101 < ema484  // แดง
+
+//****************************************************************************//
+// Colors
+bullishColor = color.green
+bearishColor = color.red
+emaColor = isBullish ? bullishColor : bearishColor
+
+//****************************************************************************//
+// Paint Bars
+barcolor(fillSW ? emaColor : na)
+
+//****************************************************************************//
+// Plot EMA Lines
+FastL = plot(fastSW ? ema101 : na, "EMA 420", color=color.new(color.red, 0), linewidth=2)
+SlowL = plot(slowSW ? ema484 : na, "EMA 484", color=color.new(color.blue, 0), linewidth=2)
+
+// Fill between EMAs
+fillcolor = isBullish ? color.new(color.green, 90) : color.new(color.red, 90)
+fill(FastL, SlowL, fillcolor)
+
+//****************************************************************************//
+// Background Color
+bgcolor(isBullish ? color.new(color.green, 95) : color.new(color.red, 95))
+
+//****************************************************************************//
+// Crossover Signals
+bullishCross = ta.crossover(ema101, ema484)
+bearishCross = ta.crossunder(ema101, ema484)
+
+// Define Buy/Sell based on crossover
+var bool inPosition = false
+var bool positionType = false  // false = bearish, true = bullish
+
+if bullishCross
+    inPosition := true
+    positionType := true
+
+if bearishCross
+    inPosition := true
+    positionType := false
+
+buy = bullishCross
+sell = bearishCross
+
+//****************************************************************************//
+// Plot Signals
+plotshape(plotSigsw and buy, "Buy Signal",
+     shape.circle,
+     location.belowbar,
+     color.new(color.green, 0),
+     size=size.small)
+
+plotshape(plotSigsw and sell, "Sell Signal",
+     shape.circle,
+     location.abovebar,
+     color.new(color.red, 0),
+     size=size.small)
+
+//****************************************************************************//
+// Label
+if labelSwitch
+    labelstyle = isBullish ? label.style_label_down : label.style_label_up
+    labelyloc = isBullish ? yloc.abovebar : yloc.belowbar
+    labeltcolor = buy ? color.black : sell ? color.white : color.white
+    labelbgcolor = isBullish ? color.green : color.red
+    labeltext = buy ? 'BUY Signal\n' : sell ? 'SELL Signal\n' : ''
+    trendText = isBullish ? 'BULLISH' : 'BEARISH'
+
+    l1 = label.new(bar_index, na,
+         text=labeltext + syminfo.ticker + ' ' + str.tostring(close, format.mintick) + '\n' + trendText + ' Trend',
+         color=labelbgcolor,
+         textcolor=labeltcolor,
+         yloc=labelyloc,
+         style=labelstyle)
+
+    label.delete(l1[1])
+
+//****************************************************************************//
+// Alert Conditions
+alertcondition(buy,
+     title='Buy Alert',
+     message='BUY {{exchange}}:{{ticker}} - EMA 420 crossed above EMA 484')
+
+alertcondition(sell,
+     title='Sell Alert',
+     message='SELL {{exchange}}:{{ticker}} - EMA 420 crossed below EMA 484')
+
+alertcondition(isBullish,
+     title='Bullish Trend',
+     message='{{ticker}} is in BULLISH trend')
+
+alertcondition(isBearish,
+     title='Bearish Trend',
+     message='{{ticker}} is in BEARISH trend')

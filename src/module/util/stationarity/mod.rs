@@ -19,7 +19,8 @@ pub fn print_stationarity_checks(xs: &[f64]) {
         return;
     }
 
-    let lags = suggest_lag(xs.len());
+    // let lags = suggest_lag(xs.len());
+    let lags = 24;
 
     // ADF
     let adf_res = adf::adf_test_level(xs, lags);
@@ -37,7 +38,7 @@ pub fn print_stationarity_checks(xs: &[f64]) {
     let kpss_res = kpss::kpss_level(xs, None);
     let (kpss_msg, kpss_cv) = kpss::kpss_interpret_level(kpss_res.stat);
     println!(
-        "KPSS (level) stat = {:.6}, bw = {}, n = {}",
+        "KPSS (level) stat = {:.7}, bw = {}, n = {}",
         kpss_res.stat, kpss_res.bw, kpss_res.n
     );
     println!(

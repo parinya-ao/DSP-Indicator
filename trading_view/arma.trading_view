@@ -1,0 +1,80 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © parinya_ao
+
+//@version=6
+indicator("xARMA(2,2)-xx", overlay=false)
+
+//****************************************************************************//
+// User Inputs
+ar1_coef = input.float(title='AR(1) Coefficient', defval=-1.0, step=0.01)
+ar2_coef = input.float(title='AR(2) Coefficient', defval=-0.41, step=0.01)
+ma1_coef = input.float(title='MA(1) Coefficient', defval=0.87, step=0.01)
+ma2_coef = input.float(title='MA(2) Coefficient', defval=0.36, step=0.01)
+constant = input.float(title='Constant', defval=0.0, step=0.01)
+
+src = input.source(title='Source', defval=close)
+showSignals = input.bool(title='Show Buy/Sell Signals', defval=true)
+
+//****************************************************************************//
+// Calculate Returns (ใช้ log returns หรือ simple returns)
+returns = ta.change(src)
+
+//****************************************************************************//
+// ARMA(2,2) Calculation
+// Y_t = constant - Y_{t-1} - 0.41*Y_{t-2} + 0.87*ε_{t-1} + 0.36*ε_{t-2}
+
+var float y = 0.0
+var float y_1 = 0.0
+var float y_2 = 0.0
+var float epsilon = 0.0
+var float epsilon_1 = 0.0
+var float epsilon_2 = 0.0
+
+// คำนวณ residual (error term)
+y := constant + ar1_coef * y_1 + ar2_coef * y_2 + ma1_coef * epsilon_1 + ma2_coef * epsilon_2
+
+// คำนวณ error ปัจจุบัน
+epsilon := returns - y
+
+// Update lagged values
+y_2 := y_1
+y_1 := y
+epsilon_2 := epsilon_1
+epsilon_1 := epsilon
+
+//****************************************************************************//
+// Plot ARMA values
+plot(y, "ARMA(2,2)", color=color.blue, linewidth=2)
+plot(returns, "Actual Returns", color=color.gray, linewidth=1)
+hline(0, "Zero Line", color=color.white, linestyle=hline.style_dashed)
+
+//****************************************************************************//
+// Plot Residuals
+plot(epsilon, "Residuals (ε)", color=color.orange, linewidth=1)
+
+//****************************************************************************//
+// Generate Signals based on ARMA forecast
+buySignal = ta.crossover(y, 0)
+sellSignal = ta.crossunder(y, 0)
+
+plotshape(showSignals and buySignal, "Buy Signal",
+     shape.triangleup,
+     location.bottom,
+     color.new(color.green, 0),
+     size=size.small)
+
+plotshape(showSignals and sellSignal, "Sell Signal",
+     shape.triangledown,
+     location.top,
+     color.new(color.red, 0),
+     size=size.small)
+
+//****************************************************************************//
+// Alert Conditions
+alertcondition(buySignal,
+     title='ARMA Buy Signal',
+     message='ARMA(2,2) crossed above zero - Potential BUY')
+
+alertcondition(sellSignal,
+     title='ARMA Sell Signal',
+     message='ARMA(2,2) crossed below zero - Potential SELL')

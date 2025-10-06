@@ -8,7 +8,10 @@ use crate::module::{
     eval::{TargetKind, ZeroRule, calculate, evaluate_directional_accuracy},
     model::{
         differencing::differencing,
-        pacf::{acf_and_choose_q, choose_p_cutoff_first_drop, pacf_levinson, pacf_ols, plot_acf_pacf_analysis},
+        pacf::{
+            acf_and_choose_q, choose_p_cutoff_first_drop, pacf_levinson, pacf_ols,
+            plot_acf_pacf_analysis,
+        },
     },
     util::{function::smooth_ma::smooth_graph, stationarity::print_stationarity_checks},
 };
@@ -74,7 +77,8 @@ fn css_sse(y: &[f64], u: &[f64], p: usize, q: usize) -> f64 {
     arma_residuals(y, &par).iter().map(|v| v * v).sum()
 }
 
-fn nelder_mead_min<F>(x0: Vec<f64>, f: F, max_iter: usize, tol: f64) -> Vec<f64> where
+fn nelder_mead_min<F>(x0: Vec<f64>, f: F, max_iter: usize, tol: f64) -> Vec<f64>
+where
     F: Fn(&[f64]) -> f64,
 {
     let n = x0.len();
@@ -364,10 +368,10 @@ pub fn arma_model() {
     }
 
     let params = fit_arma_css(&diff_smooth, p, q);
-    // println!(
-    //     "Fitted ARMA({},{}): c={:.6}, phi={:?}, theta={:?}",
-    //     p, q, params.c, params.phi, params.theta
-    // );
+    println!(
+        "Fitted ARMA({},{}): c={:.6}, phi={:?}, theta={:?}",
+        p, q, params.c, params.phi, params.theta
+    );
 
     let pred_next_diff = arma_predict_rolling(&diff_smooth, &params);
     if pred_next_diff.len() + 1 != diff.len() {

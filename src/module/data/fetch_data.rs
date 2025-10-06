@@ -11,7 +11,8 @@ pub async fn fetch_data(symbol: &str) -> Result<Vec<(u64, u64, f64)>, Box<dyn st
         chrono::LocalResult::Single(t) => t,
         _ => return Err("invalid start date".into()),
     };
-    let now_cron = match Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0) {
+    // Extend the range to cover the desired latest trading day (2025-10-05)
+    let now_cron = match Utc.with_ymd_and_hms(2025, 10, 5, 0, 0, 0) {
         chrono::LocalResult::Single(t) => t,
         _ => return Err("invalid end date".into()),
     };
@@ -57,7 +58,8 @@ pub async fn fetch_log_data(
         chrono::LocalResult::Single(t) => t,
         _ => return Err("invalid start date".into()),
     };
-    let now_cron = match Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0) {
+    // Extend the range to cover the desired latest trading day (2025-10-05)
+    let now_cron = match Utc.with_ymd_and_hms(2025, 10, 5, 0, 0, 0) {
         chrono::LocalResult::Single(t) => t,
         _ => return Err("invalid end date".into()),
     };

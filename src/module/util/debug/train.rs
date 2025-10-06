@@ -6,7 +6,11 @@ use crate::module::indicator::eval::{
     EvalMetrics, compute_metrics, eval_percent_ema_fast_slow, eval_percent_ema_sma,
     eval_with_signals,
 };
-use crate::module::model::{arma::{ArmaModel, fit_arma_with_ic}, ema::ema_series, sma::sma_series};
+use crate::module::model::{
+    arma::{ArmaModel, fit_arma_with_ic},
+    ema::ema_series,
+    sma::sma_series,
+};
 use crate::module::util::function::evaluate_cross_over::evaluate_crossover;
 use indicatif::{ProgressBar, ProgressStyle};
 
@@ -114,7 +118,6 @@ fn load_close_prices(path: &PathBuf) -> Vec<f64> {
         }
     }
 }
-
 
 pub fn run_search(data_path: PathBuf) {
     // ได้ datapath มาแล้วจะได้รู้ว่าเริ่มจากไฟล์ไหน
