@@ -464,14 +464,14 @@ pub fn plot_acf_pacf_analysis(
 // ---------------- Example helper to print ACF and suggested q ----------------
 pub fn acf_and_choose_q(y: &[f64], max_lag: usize) -> usize {
     let n = y.len();
-    let ci = acf_conf95(n);
+    let _ci = acf_conf95(n);
     // try fast fft-based acf
     let acf_fast = acf_fft(y, max_lag, true);
     // also unbiased direct for comparison (optional)
-    let acf_unbiased = acf_direct_unbiased(y, max_lag, true);
+    let _acf_unbiased = acf_direct_unbiased(y, max_lag, true);
 
     let q_first = choose_q_first_drop(&acf_fast[1..].to_vec(), n); // pass k>=1 vector
-    let q_largest = choose_q_largest_significant(&acf_fast[1..].to_vec(), n);
+    let _q_largest = choose_q_largest_significant(&acf_fast[1..].to_vec(), n);
 
     // println!("CI95 ±{:.4}", ci);
     // println!("ACF (FFT)  = {:?}", acf_fast[1..].to_vec());

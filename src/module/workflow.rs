@@ -4,7 +4,6 @@ use crate::module::model::differencing::{differencing, differencing_with_time};
 use crate::module::plot::plot_fft::plot_fft;
 use crate::module::plot::plot_graph::{plot_graph, plot_graph_from_points};
 use crate::module::util::debug::train::run_search;
-use crate::module::util::stationarity::print_stationarity_checks;
 use std::path::PathBuf;
 
 pub async fn workflow() {
@@ -33,7 +32,7 @@ pub async fn workflow() {
     let diff_path = PathBuf::from("data/SPX_log.csv");
     let differencing_value_with_time: Vec<(i64, f64)> = differencing_with_time(diff_path.clone());
     let _ = plot_graph_from_points(&*differencing_value_with_time, "diff");
-    let differencing_value: Vec<f64> = differencing(diff_path);
+    let _differencing_value: Vec<f64> = differencing(diff_path);
 
     // print_stationarity_checks(&differencing_value);
 
