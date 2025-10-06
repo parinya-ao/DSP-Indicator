@@ -9,7 +9,7 @@ use std::path::PathBuf;
 
 pub async fn workflow() {
     // save file to real data
-    if let Err(e) = save_file("SPX").await {
+    if let Err(e) = save_file("SPX_now").await {
         eprintln!("Error: {}", e);
     }
     // dave file to log data
@@ -35,7 +35,7 @@ pub async fn workflow() {
     let _ = plot_graph_from_points(&*differencing_value_with_time, "diff");
     let differencing_value: Vec<f64> = differencing(diff_path);
 
-    print_stationarity_checks(&differencing_value);
+    // print_stationarity_checks(&differencing_value);
 
     // cal แบบ ปกติ
 

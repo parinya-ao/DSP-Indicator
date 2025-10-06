@@ -54,13 +54,26 @@ pub struct ClassificationMetrics {
     pub accuracy: f64,
     pub precision: f64,
     pub recall: f64,
+    pub f1: f64,
 }
 
 pub fn calculate(report: &EvalReport) -> ClassificationMetrics {
+    let accuracy = report.accuracy();
+    let precision = report.precision();
+    let recall = report.recall();
+    let f1 = if !precision.is_finite()
+        || !recall.is_finite()
+        || (precision + recall).abs() < f64::EPSILON
+    {
+        f64::NAN
+    } else {
+        2.0 * precision * recall / (precision + recall)
+    };
     ClassificationMetrics {
-        accuracy: report.accuracy(),
-        precision: report.precision(),
-        recall: report.recall(),
+        accuracy,
+        precision,
+        recall,
+        f1,
     }
 }
 

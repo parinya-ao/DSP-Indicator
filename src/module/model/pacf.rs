@@ -3,8 +3,8 @@
 // เรียกใช้ได้: pacf_levinson, pacf_ols, pacf_conf95, choose_p_cutoff_first_drop
 
 use nalgebra::{DMatrix, DVector};
-use rustfft::{FftPlanner, num_complex::Complex as RComplex};
 use plotters::prelude::*;
+use rustfft::{FftPlanner, num_complex::Complex as RComplex};
 
 // เอา slice list มาแล้วหาค่าเฉลี่ย
 fn mean(x: &[f64]) -> f64 {
@@ -314,11 +314,7 @@ pub fn plot_acf(
         .y_label_area_size(50)
         .build_cartesian_2d(0f64..(max_lag as f64), -max_abs..max_abs)?;
 
-    chart
-        .configure_mesh()
-        .x_desc("Lag")
-        .y_desc("ACF")
-        .draw()?;
+    chart.configure_mesh().x_desc("Lag").y_desc("ACF").draw()?;
 
     // Draw confidence interval lines
     chart.draw_series(LineSeries::new(
@@ -370,10 +366,7 @@ pub fn plot_pacf(
     let root = BitMapBackend::new(output_path, (800, 600)).into_drawing_area();
     root.fill(&WHITE)?;
 
-    let max_abs = pacf_vals
-        .iter()
-        .map(|&v| v.abs())
-        .fold(ci * 1.2, f64::max);
+    let max_abs = pacf_vals.iter().map(|&v| v.abs()).fold(ci * 1.2, f64::max);
 
     let mut chart = ChartBuilder::on(&root)
         .caption(
@@ -385,11 +378,7 @@ pub fn plot_pacf(
         .y_label_area_size(50)
         .build_cartesian_2d(0f64..(max_lag as f64 + 1.0), -max_abs..max_abs)?;
 
-    chart
-        .configure_mesh()
-        .x_desc("Lag")
-        .y_desc("PACF")
-        .draw()?;
+    chart.configure_mesh().x_desc("Lag").y_desc("PACF").draw()?;
 
     // Draw confidence interval lines
     chart.draw_series(LineSeries::new(

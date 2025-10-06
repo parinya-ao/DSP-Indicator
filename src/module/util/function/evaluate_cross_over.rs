@@ -1,5 +1,7 @@
-use crate::module::{indicator::eval::compute_metrics, util::{debug::train::EvalSnapshot, function::find_real::eval_with_signals}};
-
+use crate::module::{
+    indicator::eval::compute_metrics,
+    util::{debug::train::EvalSnapshot, function::find_real::eval_with_signals},
+};
 
 pub fn evaluate_crossover(
     close: &[f64],
